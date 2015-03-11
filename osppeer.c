@@ -623,6 +623,28 @@ static task_t *task_listen(task_t *listen_task)
 	return t;
 }
 
+// assuming a file is null terminated,
+// returns true if ok, returns false otherwise
+// false if:
+// 		beginning begins with '/'
+//		there is a "../" anywhere in the address
+// Note: not sure if subdirectories are allowed, so for now, try and leave those in
+static int check_addr( char* addr ) 
+{
+	int i ;
+	int len ;
+
+	if( *addr == '/' )
+		return 1 ;
+
+	len = strlen( addr ) - 3 ;
+	for( i = 0 ; i < len ; i++ )
+	{
+		if( addr[i] == '.' && addr[i+1] == '.' && addr[i+2] == '/' )
+			return 1 ;
+	}
+	return 0 ;
+}
 
 // task_upload(t)
 //	Handles an upload request from another peer.
@@ -643,11 +665,17 @@ static void task_upload(task_t *t)
 	}
 
 	assert(t->head == 0);
+	// fix this!! buffer overflow max size of t->filename == 256, but task_buff_siz == 4096
+	// also, garauntee that filename is null terminated
 	if (osp2p_snscanf(t->buf, t->tail, "GET %s OSP2P\n", t->filename) < 0) {
 		error("* Odd request %.*s\n", t->tail, t->buf);
 		goto exit;
 	}
 	t->head = t->tail = 0;
+
+	//if( check_addr( t->filename ) ) // check for illegal addresses
+	//	error("* Cannot open file %s", t->filename);
+	//	goto exit;
 
 	t->disk_fd = open(t->filename, O_RDONLY);
 	if (t->disk_fd == -1) {
