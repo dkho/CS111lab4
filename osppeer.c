@@ -480,7 +480,7 @@ task_t *start_download(task_t *tracker_task, const char *filename)
 	strcpy(t->filename, filename);
 
 	// add peers
-	s1 = tracker_task->buf;
+	s1 = tracker_task->buf; // peername length? what if no \n ? 
 	while ((s2 = memchr(s1, '\n', (tracker_task->buf + messagepos) - s1))) {
 		if (!(p = parse_peer(s1, s2 - s1)))
 			die("osptracker responded to WANT command with unexpected format!\n");
@@ -668,7 +668,11 @@ static void task_upload(task_t *t)
 	assert(t->head == 0);
 	// fix this!! buffer overflow max size of t->filename == 256, but task_buff_siz == 4096
 	// also, garauntee that filename is null terminated
-	if (osp2p_snscanf(t->buf, t->tail, "GET %s OSP2P\n", t->filename) < 0) {
+	//if (osp2p_snscanf(t->buf, t->tail, "GET %s OSP2P\n", t->filename) < 0) {
+	//	error("* Odd request %.*s\n", t->tail, t->buf);
+	//	goto exit;
+	//}
+	if (osp2p_snscanf(t->buf, FILENAMESIZ, "GET %s OSP2P\n", t->filename) < 0) { 
 		error("* Odd request %.*s\n", t->tail, t->buf);
 		goto exit;
 	}
@@ -795,34 +799,34 @@ int main(int argc, char *argv[])
 	  p = fork();
 	  //printf("hi\n");
 	  if(p == 0){
-	    printf("9\n");
+	    //printf("9\n");
 	    if (t){
 	      task_download(t, tracker_task);
 	    }
 	    exit(0);
 	  } else {
-	    printf("`");
+	    //printf("`");
 	    pCount++;
 	    if(pCount >= 20){
-	      printf("1");
+	      //printf("1");
 	      waitpid(-1, NULL, 0);
-	      printf("2");
+	      //printf("2");
 	      pCount--;
 	    }
 	  }
 	}
 
-	printf("\n!\n");
+	//printf("\n!\n");
 
 	while((p = waitpid(-1, NULL, 0))){
 	  pCount--;
-	  printf("\n!!\n");
+	  //printf("\n!!\n");
 	  if(errno == ECHILD){
 	    break;
 	  }
 	}
 
-	printf("pCount: %d\n", pCount);
+	//printf("pCount: %d\n", pCount);
 	// Then accept connections from other peers and upload files to them!
 	while ((t = task_listen(listen_task))){
 	  pid_t p = fork();
