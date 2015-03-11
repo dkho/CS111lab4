@@ -692,6 +692,7 @@ int main(int argc, char *argv[])
 	const char *myalias;
 	struct passwd *pwent;
 	int pCount = 0;
+	pid_t p;
 
 	// Default tracker is read.cs.ucla.edu
 	osp2p_sscanf("131.179.80.139:11111", "%I:%d",
@@ -762,13 +763,14 @@ int main(int argc, char *argv[])
 
 	// First, download files named on command line.
 	for (; argc > 1; argc--, argv++){
-	  pid_t p = fork();
+	  p = fork();
 	  if(p == 0){
 	    if ((t = start_download(tracker_task, argv[1]))){
 	      task_download(t, tracker_task);
 	    }
 	    exit(0);
 	  } else {
+	    printf("`");
 	    pCount++;
 	    if(pCount >= 20){
 	      waitpid(-1, NULL, 0);
@@ -777,8 +779,15 @@ int main(int argc, char *argv[])
 	  }
 	}
 
-	while(!waitpid(-1, NULL, 0))
+	printf(",");
+
+	while((p = waitpid(-1, NULL, 0))){
 	  pCount--;
+	  printf(".");
+	  if(errno == ECHILD){
+	    break;
+	  }
+	}
 
 	printf("pCount: %d\n", pCount);
 	// Then accept connections from other peers and upload files to them!
@@ -795,9 +804,13 @@ int main(int argc, char *argv[])
 	  }
 	}
 
-	while(!waitpid(-1,NULL,0))
+	while((p = waitpid(-1, NULL, 0))){
 	  pCount--;
-
+	  if(errno == ECHILD){
+	    break;
+	  }
+	}
+	
 	return 0;
 }
 
