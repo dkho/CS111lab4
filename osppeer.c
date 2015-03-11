@@ -779,9 +779,24 @@ int main(int argc, char *argv[])
 
 	while(!waitpid(-1, NULL, 0))
 	  pCount--;
+
+	printf("pCount: %d\n", pCount);
 	// Then accept connections from other peers and upload files to them!
-	while ((t = task_listen(listen_task)))
-		task_upload(t);
+	while ((t = task_listen(listen_task))){
+	  pid_t p = fork();
+	  if(p == 0){
+	    task_upload(t);
+	  } else {
+	    pCount++;
+	    if(pCount >= 20){
+	      waitpid(-1,NULL,0);
+	      pCount--;
+	    }
+	  }
+	}
+
+	while(!waitpid(-1,NULL,0))
+	  pCount--;
 
 	return 0;
 }
