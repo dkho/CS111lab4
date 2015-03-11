@@ -763,9 +763,12 @@ int main(int argc, char *argv[])
 
 	// First, download files named on command line.
 	for (; argc > 1; argc--, argv++){
+	  t = start_download(tracker_task, argv[1]);
 	  p = fork();
+	  //printf("hi\n");
 	  if(p == 0){
-	    if ((t = start_download(tracker_task, argv[1]))){
+	    printf("9\n");
+	    if (t){
 	      task_download(t, tracker_task);
 	    }
 	    exit(0);
@@ -773,17 +776,19 @@ int main(int argc, char *argv[])
 	    printf("`");
 	    pCount++;
 	    if(pCount >= 20){
+	      printf("1");
 	      waitpid(-1, NULL, 0);
+	      printf("2");
 	      pCount--;
 	    }
 	  }
 	}
 
-	printf(",");
+	printf("\n!\n");
 
 	while((p = waitpid(-1, NULL, 0))){
 	  pCount--;
-	  printf(".");
+	  printf("\n!!\n");
 	  if(errno == ECHILD){
 	    break;
 	  }
@@ -813,4 +818,5 @@ int main(int argc, char *argv[])
 	
 	return 0;
 }
+
 
