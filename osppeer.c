@@ -20,6 +20,7 @@
 #include <pwd.h>
 #include <time.h>
 #include <limits.h>
+#include <sys/wait.h>
 #include "md5.h"
 #include "osp2p.h"
 
@@ -690,6 +691,7 @@ int main(int argc, char *argv[])
 	char *s;
 	const char *myalias;
 	struct passwd *pwent;
+	int pCount = 0;
 
 	// Default tracker is read.cs.ucla.edu
 	osp2p_sscanf("131.179.80.139:11111", "%I:%d",
@@ -759,10 +761,24 @@ int main(int argc, char *argv[])
 	register_files(tracker_task, myalias);
 
 	// First, download files named on command line.
-	for (; argc > 1; argc--, argv++)
-		if ((t = start_download(tracker_task, argv[1])))
-			task_download(t, tracker_task);
+	for (; argc > 1; argc--, argv++){
+	  pid_t p = fork();
+	  if(p == 0){
+	    if ((t = start_download(tracker_task, argv[1]))){
+	      task_download(t, tracker_task);
+	    }
+	    exit(0);
+	  } else {
+	    pCount++;
+	    if(pCount >= 20){
+	      waitpid(-1, NULL, 0);
+	      pCount--;
+	    }
+	  }
+	}
 
+	while(!waitpid(-1, NULL, 0))
+	  pCount--;
 	// Then accept connections from other peers and upload files to them!
 	while ((t = task_listen(listen_task)))
 		task_upload(t);
