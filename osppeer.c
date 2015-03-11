@@ -164,7 +164,9 @@ taskbufresult_t read_to_taskbuf(int fd, task_t *t)
 	unsigned tailpos = (t->tail % TASKBUFSIZ);
 	ssize_t amt;
 
-	if (t->head == t->tail || headpos < tailpos)
+	printf("%d,%d\n", headpos, tailpos);
+
+	if (t->head == t->tail || headpos < tailpos )
 		amt = read(fd, &t->buf[tailpos], TASKBUFSIZ - tailpos);
 	else
 		amt = read(fd, &t->buf[tailpos], headpos - tailpos);
@@ -306,7 +308,7 @@ static size_t read_tracker_response(task_t *t)
 					return split_pos;
 				}
 			}
-
+		printf("%d\n",pos);
 		// If not, read more data.  Note that the read will not block
 		// unless NO data is available.
 		int ret = read_to_taskbuf(t->peer_fd, t);
@@ -822,6 +824,7 @@ int main(int argc, char *argv[])
 	  pCount--;
 	  //printf("\n!!\n");
 	  if(errno == ECHILD){
+	    pCount = 0;
 	    break;
 	  }
 	}
@@ -832,6 +835,7 @@ int main(int argc, char *argv[])
 	  pid_t p = fork();
 	  if(p == 0){
 	    task_upload(t);
+	    task_free(t);
 	  } else {
 	    pCount++;
 	    if(pCount >= 20){
