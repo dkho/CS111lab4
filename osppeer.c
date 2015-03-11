@@ -657,6 +657,7 @@ static void task_upload(task_t *t)
 {
 	assert(t->type == TASK_UPLOAD);
 	// First, read the request from the peer.
+	
 	while (1) {
 		int ret = read_to_taskbuf(t->peer_fd, t);
 		if (ret == TBUF_ERROR) {
@@ -808,6 +809,7 @@ int main(int argc, char *argv[])
 	    exit(0);
 	  } else {
 	    //printf("`");
+	    task_free(t);
 	    pCount++;
 	    if(pCount >= 20){
 	      //printf("1");
@@ -835,8 +837,9 @@ int main(int argc, char *argv[])
 	  pid_t p = fork();
 	  if(p == 0){
 	    task_upload(t);
-	    task_free(t);
+	    //task_free(t);
 	  } else {
+	    task_free(t);
 	    pCount++;
 	    if(pCount >= 20){
 	      waitpid(-1,NULL,0);
