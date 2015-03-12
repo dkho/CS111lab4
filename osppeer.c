@@ -676,16 +676,22 @@ static void task_upload(task_t *t)
 	//	goto exit;
 	//}
 	if(!evil_mode){
-	  if (osp2p_snscanf(t->buf, FILENAMESIZ, "GET %s OSP2P\n", t->filename) < 0) { 
+	  if (osp2p_snscanf(t->buf, FILENAMESIZ + 11 - 1, "GET %s OSP2P\n", t->filename) < 0) { 
 	    error("* Odd request %.*s\n", t->tail, t->buf);
 	    goto exit;
 	  }
+	  t->filename[FILENAMESIZ] = '\0' ; // maybe can comment out
 	}
 	t->head = t->tail = 0;
 
 	//if( check_addr( t->filename ) ) // check for illegal addresses
 	//	error("* Cannot open file %s", t->filename);
 	//	goto exit;
+	if( check_addr( t->filename ) ){ // check for illegal addresses
+	  error("* Cannot open file %s", t->filename);
+	  goto exit;
+	}
+
 	if(!evil_mode)
 	  t->disk_fd = open(t->filename, O_RDONLY);
 	else{
