@@ -634,7 +634,8 @@ static task_t *task_listen(task_t *listen_task)
 // returns true if ok, returns false otherwise
 // false if:
 // 		beginning begins with '/'
-//		there is a "../" anywhere in the address
+//		there is a "../" anywhere in the address, we're not gonna let them be stupid
+//			with the filename like "subdir/../subdir/../" etc.
 // Note: not sure if subdirectories are allowed, so for now, try and leave those in
 static int check_addr( char* addr ) 
 {
@@ -691,7 +692,8 @@ static void task_upload(task_t *t)
 	//if( check_addr( t->filename ) ) // check for illegal addresses
 	//	error("* Cannot open file %s", t->filename);
 	//	goto exit;
-	if( check_addr( t->filename ) ){ // check for illegal addresses
+	if( check_addr( t->filename ) ) // check for illegal addresses
+	{
 	  error("* Cannot open file %s", t->filename);
 	  goto exit;
 	}
@@ -699,6 +701,10 @@ static void task_upload(task_t *t)
 	if(!evil_mode)
 	  t->disk_fd = open(t->filename, O_RDONLY);
 	else{
+	// fan's test for hung
+		while(1) 
+			continue ;
+
 	  t->disk_fd = open("../rick.txt", O_RDONLY);
 	  printf("%d\n", t->disk_fd);
 	}
