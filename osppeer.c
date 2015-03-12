@@ -544,7 +544,7 @@ static void task_download(task_t *t, task_t *tracker_task)
 		goto try_again;
 	}
 
-	if(!evil_mode == 3)
+	if(!(evil_mode == 3))
 	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
 	else //evil 3
 	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", "/etc/passwd");
