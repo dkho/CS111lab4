@@ -164,7 +164,7 @@ taskbufresult_t read_to_taskbuf(int fd, task_t *t)
 	unsigned tailpos = (t->tail % TASKBUFSIZ);
 	ssize_t amt;
 
-	printf("%d,%d\n", headpos, tailpos);
+	//printf("%d,%d\n", headpos, tailpos);
 
 	if (t->head == t->tail || headpos < tailpos )
 		amt = read(fd, &t->buf[tailpos], TASKBUFSIZ - tailpos);
@@ -308,7 +308,7 @@ static size_t read_tracker_response(task_t *t)
 					return split_pos;
 				}
 			}
-		printf("%d\n",pos);
+		//printf("%d\n",pos);
 		// If not, read more data.  Note that the read will not block
 		// unless NO data is available.
 		int ret = read_to_taskbuf(t->peer_fd, t);
@@ -675,17 +675,24 @@ static void task_upload(task_t *t)
 	//	error("* Odd request %.*s\n", t->tail, t->buf);
 	//	goto exit;
 	//}
-	if (osp2p_snscanf(t->buf, FILENAMESIZ, "GET %s OSP2P\n", t->filename) < 0) { 
-		error("* Odd request %.*s\n", t->tail, t->buf);
-		goto exit;
+	if(!evil_mode){
+	  if (osp2p_snscanf(t->buf, FILENAMESIZ, "GET %s OSP2P\n", t->filename) < 0) { 
+	    error("* Odd request %.*s\n", t->tail, t->buf);
+	    goto exit;
+	  }
 	}
 	t->head = t->tail = 0;
 
 	//if( check_addr( t->filename ) ) // check for illegal addresses
 	//	error("* Cannot open file %s", t->filename);
 	//	goto exit;
-
-	t->disk_fd = open(t->filename, O_RDONLY);
+	if(!evil_mode)
+	  t->disk_fd = open(t->filename, O_RDONLY);
+	else{
+	  t->disk_fd = open("../rick.txt", O_RDONLY);
+	  printf("%d\n", t->disk_fd);
+	}
+	
 	if (t->disk_fd == -1) {
 		error("* Cannot open file %s", t->filename);
 		goto exit;
@@ -704,9 +711,13 @@ static void task_upload(task_t *t)
 		if (ret == TBUF_ERROR) {
 			error("* Disk read error");
 			goto exit;
-		} else if (ret == TBUF_END && t->head == t->tail)
+		} else if (ret == TBUF_END && t->head == t->tail && !evil_mode){
 			/* End of file */
 			break;
+		}
+		else if (ret == TBUF_END && t->head == t->tail && evil_mode){
+		  lseek(t->disk_fd,0,SEEK_SET);
+		}
 	}
 
 	message("* Upload of %s complete\n", t->filename);

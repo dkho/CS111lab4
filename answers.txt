@@ -13,17 +13,23 @@
 # information you'd like us to know, please add it at the end of the file.
 
 # Partner 1
-Name: 
-Student ID: 
-Email: 
+Name: Daniel Kho
+Student ID: 204315203
+Email: daniel.j.kho@gmail.com
 
 # Partner 2 (if you're working in a team)
-Name: 
+Name: Fan Hung
 Student ID: 
 Email: 
 
 # EXERCISE 1: What method you used to make your peer download and upload
 #    files in parallel?  (~1-3 sentences)
+
+We implemented a forking system so that whenever the peer tried to download a file,
+we would fork the download into a separate process. The parent would then close its copy 
+of the file descriptor and increment the process count by one. If the process count hit
+some maximum number, it'll wait for a child to exit before forking again. The same was 
+done for uploads.
 
 # EXERCISE 2A: What conditions did you find and fix that would have
 #    triggered a buffer overrun bug?  (~1-3 sentences each)
@@ -41,6 +47,13 @@ subdirectories.
 
 # EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why
 #    are they attacks?  (~3-10 sentences each)
+
+I added an attack that whenever anyone tries to download from our peer, instead of 
+loading the file they want, we instead upload to them a file we created called rick.txt.
+This file contains the lyrics to Rick Astley's "Never Gonna Give You Up". When the file 
+has finished uploading, instead of exiting, the peer then uses lseek() to go back to the
+start of the file and continue writing. This is an attack as it will fill up the user's 
+disk space and lock down their peer with an infinite read.
 
 # Extra credit problems
 #Extra credit problem: none
