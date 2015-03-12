@@ -164,7 +164,9 @@ taskbufresult_t read_to_taskbuf(int fd, task_t *t)
 	unsigned tailpos = (t->tail % TASKBUFSIZ);
 	ssize_t amt;
 
-	if (t->head == t->tail || headpos < tailpos)
+	printf("%d,%d\n", headpos, tailpos);
+
+	if (t->head == t->tail || headpos < tailpos )
 		amt = read(fd, &t->buf[tailpos], TASKBUFSIZ - tailpos);
 	else
 		amt = read(fd, &t->buf[tailpos], headpos - tailpos);
@@ -306,7 +308,7 @@ static size_t read_tracker_response(task_t *t)
 					return split_pos;
 				}
 			}
-
+		printf("%d\n",pos);
 		// If not, read more data.  Note that the read will not block
 		// unless NO data is available.
 		int ret = read_to_taskbuf(t->peer_fd, t);
@@ -655,6 +657,7 @@ static void task_upload(task_t *t)
 {
 	assert(t->type == TASK_UPLOAD);
 	// First, read the request from the peer.
+	
 	while (1) {
 		int ret = read_to_taskbuf(t->peer_fd, t);
 		if (ret == TBUF_ERROR) {
@@ -730,7 +733,7 @@ int main(int argc, char *argv[])
 	pid_t p;
 
 	// Default tracker is read.cs.ucla.edu 
-	osp2p_sscanf("164.67.100.231:11111", "%I:%d",
+	osp2p_sscanf("164.67.100.231:12996", "%I:%d",
 		     &tracker_addr, &tracker_port);
 	if ((pwent = getpwuid(getuid()))) {
 		myalias = (const char *) malloc(strlen(pwent->pw_name) + 20);
@@ -809,6 +812,7 @@ int main(int argc, char *argv[])
 	    exit(0);
 	  } else {
 	    //printf("`");
+	    task_free(t);
 	    pCount++;
 	    if(pCount >= 20){
 	      //printf("1");
@@ -825,6 +829,7 @@ int main(int argc, char *argv[])
 	  pCount--;
 	  //printf("\n!!\n");
 	  if(errno == ECHILD){
+	    pCount = 0;
 	    break;
 	  }
 	}
@@ -835,7 +840,9 @@ int main(int argc, char *argv[])
 	  pid_t p = fork();
 	  if(p == 0){
 	    task_upload(t);
+	    //task_free(t);
 	  } else {
+	    task_free(t);
 	    pCount++;
 	    if(pCount >= 20){
 	      waitpid(-1,NULL,0);
