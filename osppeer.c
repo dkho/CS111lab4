@@ -294,6 +294,7 @@ static size_t read_tracker_response(task_t *t)
 	while (1) {
 		// Check for whether buffer is complete.
 		for (; pos+3 < t->tail; pos++)
+		{
 			if ((pos == 0 || t->buf[pos-1] == '\n')
 			    && isdigit((unsigned char) t->buf[pos])
 			    && isdigit((unsigned char) t->buf[pos+1])
@@ -308,17 +309,69 @@ static size_t read_tracker_response(task_t *t)
 					return split_pos;
 				}
 			}
-		//printf("%d\n",pos);
+		}
 		// If not, read more data.  Note that the read will not block
 		// unless NO data is available.
 		int ret = read_to_taskbuf(t->peer_fd, t);
+
 		if (ret == TBUF_ERROR)
 			die("tracker read error");
-		else if (ret == TBUF_END)
-			die("tracker connection closed prematurely!\n");
+		else if (ret == TBUF_END) 
+			die("tracker connection closed prematurely!\n"); // prolly shouldn't get this 
 	}
 }
 
+
+// takes in a pointer and slaps a buffer onto it
+static size_t read_peer_list(char **buffer, int peer_fd )
+{
+	size_t split_pos = (size_t) -1, pos = 0;
+	size_t tail = 0;
+	size_t sum = TASKBUFSIZ ;
+	int amt ;
+	char* buff = (char*) malloc( sum ) ;
+
+	while (1) {
+		// Check for whether buffer is complete.
+		for (; pos+3 < tail; pos++)
+		{
+			if ((pos == 0 || buff[pos-1] == '\n')
+			    && isdigit((unsigned char) buff[pos])
+			    && isdigit((unsigned char) buff[pos+1])
+			    && isdigit((unsigned char) buff[pos+2])) {
+				if (split_pos == (size_t) -1)
+					split_pos = pos;
+				if (pos + 4 >= tail)
+					break;
+				if (isspace((unsigned char) buff[pos + 3])
+				    && buff[tail - 1] == '\n') {
+					buff[tail] = '\0';
+					*buffer = buff ;
+					return split_pos;
+				}
+			}
+		}
+		// If not, read more data.  Note that the read will not block
+		// unless NO data is available.
+		
+		amt = read( peer_fd, &buff[tail], TASKBUFSIZ );
+
+		//if (amt == -1 && (errno == EINTR || errno == EAGAIN
+		//	  || errno == EWOULDBLOCK))
+		//	continue ; //return TBUF_AGAIN;
+		if (amt == -1)
+			die("tracker read error");
+		else
+		{
+			tail += amt ;
+			if( tail + TASKBUFSIZ > sum )
+			{
+				sum += TASKBUFSIZ ;
+				buff = (char*) realloc( buff, sum ) ;
+			}
+		}
+	}
+}
 
 // start_tracker(addr, port)
 //	Opens a connection to the tracker at address 'addr' and port 'port'.
@@ -463,17 +516,25 @@ task_t *start_download(task_t *tracker_task, const char *filename)
 	task_t *t = NULL;
 	peer_t *p;
 	size_t messagepos;
+	char* buffer = NULL ;
 	assert(tracker_task->type == TASK_TRACKER);
 
 	message("* Finding peers for '%s'\n", filename);
 
 	osp2p_writef(tracker_task->peer_fd, "WANT %s\n", filename);
-	messagepos = read_tracker_response(tracker_task);
-	if (tracker_task->buf[messagepos] != '2') {
+
+	//read_tracker_response(tracker_task) ;
+	messagepos = read_peer_list( &buffer, tracker_task->peer_fd )  ; 
+
+
+
+	//printf("here goes nothing: %s\n", buffer) ;
+	if (buffer[messagepos] != '2') {
 		error("* Tracker error message while requesting '%s':\n%s",
-		      filename, &tracker_task->buf[messagepos]);
+		      filename, &buffer[messagepos]);
 		goto exit;
 	}
+	//printf("made it out\n") ;
 
 	if (!(t = task_new(TASK_DOWNLOAD))) {
 		error("* Error while allocating task");
@@ -482,18 +543,19 @@ task_t *start_download(task_t *tracker_task, const char *filename)
 	strcpy(t->filename, filename);
 
 	// add peers
-	s1 = tracker_task->buf; // peername length? what if no \n ? 
-	while ((s2 = memchr(s1, '\n', (tracker_task->buf + messagepos) - s1))) {
+	s1 = buffer; // peername length? what if no \n ? 
+	while ((s2 = memchr(s1, '\n', (buffer + messagepos) - s1))) {
 		if (!(p = parse_peer(s1, s2 - s1)))
 			die("osptracker responded to WANT command with unexpected format!\n");
 		p->next = t->peer_list;
 		t->peer_list = p;
 		s1 = s2 + 1;
 	}
-	if (s1 != tracker_task->buf + messagepos)
+	if (s1 != buffer + messagepos)
 		die("osptracker's response to WANT has unexpected format!\n");
 
  exit:
+ 	free( buffer ) ;
 	return t;
 }
 
@@ -698,9 +760,9 @@ static void task_upload(task_t *t)
 	  t->disk_fd = open(t->filename, O_RDONLY);
 	else{
 	// fan's test for hung
-		while(1) 
-			continue ;
-
+	//	while(1) 
+	//		continue ;
+	// Results: so our osppeer will just come back to us and say that the read was empty
 	  t->disk_fd = open("../rick.txt", O_RDONLY);
 	  printf("%d\n", t->disk_fd);
 	}
