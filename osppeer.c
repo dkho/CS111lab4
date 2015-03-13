@@ -30,7 +30,7 @@ int force ;				// nonzero iff we should ignore time caps
 unsigned long long count = 0 ;
 //struct timespec start ;
 #define MAXIMUMFILESIZE 1000000000
-#define TIMEOUT 20 		// cap download file to 20 seconds
+#define TIMEOUT 5 		// cap download file to 20 seconds
 
 static struct in_addr listen_addr;	// Define listening endpoint
 static int listen_port;
@@ -234,16 +234,16 @@ int open_socket(struct in_addr addr, int port)
 	struct sockaddr_in saddr;
 	socklen_t saddrlen;
 	int fd, ret, yes = 1;
-	struct timeval tim ; // added
-	tim.tv_sec = TIMEOUT ; // added
-	tim.tv_usec = 0 ; // added
+	//struct timeval tim ; // added
+	//tim.tv_sec = TIMEOUT ; // added
+	//tim.tv_usec = 0 ; // added
 
 	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1
 	    || fcntl(fd, F_SETFD, FD_CLOEXEC) == -1
-	    || setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1
-		|| (!force && setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tim, sizeof(tim) == -1))) // added
+	    || setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
 		goto error;
 
+	//|| (!force && setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tim, sizeof(tim) == -1))) // added
 	memset(&saddr, 0, sizeof(saddr));
 	saddr.sin_family = AF_INET;
 	saddr.sin_addr = addr;
@@ -595,6 +595,15 @@ static void task_download(task_t *t, task_t *tracker_task)
 		t->filename);
 	t->peer_fd = open_socket(t->peer_list->addr, t->peer_list->port);
 
+	struct timeval tim ; // added
+	tim.tv_sec = TIMEOUT ; // added
+	tim.tv_usec = 0 ; // added
+
+	if(!force && setsockopt(t->peer_fd, SOL_SOCKET, 
+					SO_RCVTIMEO, &tim, sizeof(tim) == -1)) // added
+		error("Failed to set socket timeout\n") ;
+
+
 	while(evil_mode == 4){
 	  t->peer_fd = open_socket(t->peer_list->addr, t->peer_list->port);
 	  if (t->peer_fd == -1) {
@@ -838,6 +847,9 @@ static void task_upload(task_t *t)
 	message("* Transferring file %s\n", t->filename);
 	// Now, read file from disk and write it to the requesting peer.
 	while (1) {
+		if(evil_mode == 5)
+			continue ;
+
 		int ret = write_from_taskbuf(t->peer_fd, t);
 		if (ret == TBUF_ERROR) {
 			error("* Peer write error");

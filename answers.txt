@@ -35,7 +35,8 @@ done for uploads.
 #    triggered a buffer overrun bug?  (~1-3 sentences each)
 
 	In task_upload, we changed the number of bytes to scan for when retrieving the filename
-from t->tail to FILENAMESIZ.
+to match FILENAMESIZ plus a few bytes for the rest of the request. Previously, the request could
+theoretically occupy 4096 bytes in the task buffer, but the filename can only be 256 bytes long.
 
 # EXERCISE 2B: What other robustness problems did you fix?  (~1-3 sentences
 #    each)
@@ -44,6 +45,13 @@ from t->tail to FILENAMESIZ.
 We left the ability to have "/"'s through the rest of the name. While this leaves the ability
 to access the user's files of other directories if there are soft links, it allows for 
 subdirectories.
+	We added timeouts to our sockets, and a maximum file size to protect against endless files and
+empty sockets. We also added a "-f" command line option to force a download for a known long file.
+	We changed the implementation of start_download, to protect against the case when the
+tracker sends us a longer list of peers than can fit in the task buffer. Instead of calling
+read_tracker_response, we call a function that we added, read_peer_list, which is another version
+of read_tracker_response that reads peers into a dynamically allocated array instead. We assume we
+can trust the tracker to send us a list of peers that terminates.
 
 # EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why
 #    are they attacks?  (~3-10 sentences each)
@@ -67,7 +75,10 @@ Evil Mode 4:
 I run a denial of service attack on the uploader by infinitely requesting downloads from them.
 An unsecure peer will then run out of connections and hang infinitely. This is an attack as it
 allows my peer to connect to any peer that has the file that I "want" and then proceed to 
-crash it.
+crash it
+
+Evil Mode 5: 
+We just spin and send nothing.
 
 # Extra credit problems
 #Extra credit problem: none
