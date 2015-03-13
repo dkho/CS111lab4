@@ -25,6 +25,8 @@
 #include "osp2p.h"
 
 int evil_mode;			// nonzero iff this peer should behave badly
+int force ;				// nonzero iff we should ignore time caps
+struct timespec start ;
 
 static struct in_addr listen_addr;	// Define listening endpoint
 static int listen_port;
@@ -526,8 +528,6 @@ task_t *start_download(task_t *tracker_task, const char *filename)
 	//read_tracker_response(tracker_task) ;
 	messagepos = read_peer_list( &buffer, tracker_task->peer_fd )  ; 
 
-
-
 	//printf("here goes nothing: %s\n", buffer) ;
 	if (buffer[messagepos] != '2') {
 		error("* Tracker error message while requesting '%s':\n%s",
@@ -613,8 +613,9 @@ static void task_download(task_t *t, task_t *tracker_task)
 	  name[3999] = '\0';
 
 	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", name);
-	  
-	} else
+	  goto try_again ; 
+	} 
+	else
 	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
 
 
@@ -646,6 +647,13 @@ static void task_download(task_t *t, task_t *tracker_task)
 
 	// Read the file into the task buffer from the peer,
 	// and write it from the task buffer onto disk.
+
+	if( !force ) // start a timer
+		if( !clock_gettime( CLOCK_MONOTONIC, &start ) )
+		{
+			error("Failed to grab start time, try force again\n") ;
+			force = 0 ;
+		}
 	while (1) {
 		int ret = read_to_taskbuf(t->peer_fd, t);
 		if (ret == TBUF_ERROR) {
@@ -655,6 +663,17 @@ static void task_download(task_t *t, task_t *tracker_task)
 			/* End of file */
 			break;
 
+		if( !force )
+		{
+			struct timespec end ;
+			// normally shouldn't fail, ignore when it does
+			clock_gettime( CLOCK_MONOTONIC, &end ) ; 
+			if( end.tv_sec - start.tv_sec > 60 )
+			{
+				error("Time out, peer took longer than 1 minute, continuing to next peer\n") ;
+				goto try_again ;
+			}
+		}
 		ret = write_from_taskbuf(t->disk_fd, t);
 		if (ret == TBUF_ERROR) {
 			error("* Disk write error");
@@ -889,12 +908,17 @@ int main(int argc, char *argv[])
 		evil_mode = 1;
 		--argc, ++argv;
 		goto argprocess;
+	} else if (argc >= 2 && strcmp(argv[1], "-f") == 0) { // added, force: disobey caps
+		force = 1;
+		--argc, ++argv;
+		goto argprocess;
 	} else if (argc >= 2 && (strcmp(argv[1], "--help") == 0
 				 || strcmp(argv[1], "-h") == 0)) {
 		printf("Usage: osppeer [-tADDR:PORT | -tPORT] [-dDIR] [-b]\n"
 "Options: -tADDR:PORT  Set tracker address and/or port.\n"
 "         -dDIR        Upload and download files from directory DIR.\n"
-"         -b[MODE]     Evil mode!!!!!!!!\n");
+"         -b[MODE]     Evil mode!!!!!!!!\n"
+"         -f           Force: disobey timeout.\n");
 		exit(0);
 	}
 

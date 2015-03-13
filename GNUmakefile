@@ -1,7 +1,7 @@
 CC	= gcc
 CFLAGS	= -g -W -Wall -Werror -Wno-unused
 V	= @
-LIBS	= -lpthread
+LIBS	= -lpthread -lrt
 
 # Uncomment the following line to run on Solaris machines.
 #LIBS	+= -lsocket -lnsl -lresolv
