@@ -23,10 +23,14 @@
 #include <sys/wait.h>
 #include "md5.h"
 #include "osp2p.h"
+#include <sys/time.h>
 
 int evil_mode;			// nonzero iff this peer should behave badly
 int force ;				// nonzero iff we should ignore time caps
-struct timespec start ;
+unsigned long long count = 0 ;
+//struct timespec start ;
+#define MAXIMUMFILESIZE 1000000000
+#define TIMEOUT 20 		// cap download file to 20 seconds
 
 static struct in_addr listen_addr;	// Define listening endpoint
 static int listen_port;
@@ -230,10 +234,14 @@ int open_socket(struct in_addr addr, int port)
 	struct sockaddr_in saddr;
 	socklen_t saddrlen;
 	int fd, ret, yes = 1;
+	struct timeval tim ; // added
+	tim.tv_sec = TIMEOUT ; // added
+	tim.tv_usec = 0 ; // added
 
 	if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1
 	    || fcntl(fd, F_SETFD, FD_CLOEXEC) == -1
-	    || setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
+	    || setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1
+		|| (!force && setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tim, sizeof(tim) == -1))) // added
 		goto error;
 
 	memset(&saddr, 0, sizeof(saddr));
@@ -648,31 +656,45 @@ static void task_download(task_t *t, task_t *tracker_task)
 	// Read the file into the task buffer from the peer,
 	// and write it from the task buffer onto disk.
 
-	if( !force ) // start a timer
-		if( clock_gettime( CLOCK_MONOTONIC, &start ) )
-		{
-			error("Failed to grab start time, try force again\n") ;
-			force = 0 ;
-		}
+	//if( !force ) // start a timer
+	//	if( clock_gettime( CLOCK_MONOTONIC, &start ) )
+	//	{
+	//		error("Failed to grab start time, try force again\n") ;
+	//		force = 0 ;
+	//	}
+	count = 0 ;
 	while (1) {
 		int ret = read_to_taskbuf(t->peer_fd, t);
 		if (ret == TBUF_ERROR) {
 			error("* Peer read error");
 			goto try_again;
-		} else if (ret == TBUF_END && t->head == t->tail)
+		}
+		else if( ret == TBUF_AGAIN )
+		{
+			error("* Peer timeout") ;
+			goto try_again ;
+		}
+		else if (ret == TBUF_END && t->head == t->tail)
 			/* End of file */
 			break;
 
 		if( !force )
 		{
-			struct timespec end ;
-			// normally shouldn't fail, ignore when it does
-			clock_gettime( CLOCK_MONOTONIC, &end ) ; 
-			if( end.tv_sec - start.tv_sec > 60 )
-			{
-				error("Time out, peer took longer than 1 minute, continuing to next peer\n") ;
+			unsigned headpos = (t->head % TASKBUFSIZ);
+			unsigned tailpos = (t->tail % TASKBUFSIZ);
+			count += tailpos - headpos ;
+
+			if( count > MAXIMUMFILESIZE )
+				error("* FIle too long (use -f to override)") ;
 				goto try_again ;
-			}
+			//struct timespec end ;
+			//// normally shouldn't fail, ignore when it does
+			//clock_gettime( CLOCK_MONOTONIC, &end ) ; 
+			//if( end.tv_sec - start.tv_sec > TIMEOUT )
+			//{
+			//	error("Time out, peer took longer than 1 minute, continuing to next peer\n") ;
+			//	goto try_again ;
+			//}
 		}
 		ret = write_from_taskbuf(t->disk_fd, t);
 		if (ret == TBUF_ERROR) {
