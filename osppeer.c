@@ -30,7 +30,7 @@ int force ;				// nonzero iff we should ignore time caps
 unsigned long long count = 0 ;
 //struct timespec start ;
 #define MAXIMUMFILESIZE 1000000000
-#define TIMEOUT 5 		// cap download file to 20 seconds
+#define TIMEOUT 5 		
 
 static struct in_addr listen_addr;	// Define listening endpoint
 static int listen_port;
@@ -689,11 +689,11 @@ static void task_download(task_t *t, task_t *tracker_task)
 
 		if( !force )
 		{
-			unsigned headpos = (t->head % TASKBUFSIZ);
-			unsigned tailpos = (t->tail % TASKBUFSIZ);
-			count += tailpos - headpos ;
+			//unsigned headpos = (t->head % TASKBUFSIZ);
+			//unsigned tailpos = (t->tail % TASKBUFSIZ);
+			//count += tailpos - headpos ;
 
-			if( count > MAXIMUMFILESIZE )
+			if( t->total_written > MAXIMUMFILESIZE )
 				error("* FIle too long (use -f to override)") ;
 				goto try_again ;
 			//struct timespec end ;
