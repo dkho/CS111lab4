@@ -649,7 +649,7 @@ static void task_download(task_t *t, task_t *tracker_task)
 	// and write it from the task buffer onto disk.
 
 	if( !force ) // start a timer
-		if( !clock_gettime( CLOCK_MONOTONIC, &start ) )
+		if( clock_gettime( CLOCK_MONOTONIC, &start ) )
 		{
 			error("Failed to grab start time, try force again\n") ;
 			force = 0 ;
