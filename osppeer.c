@@ -27,10 +27,12 @@
 
 int evil_mode;			// nonzero iff this peer should behave badly
 int force ;				// nonzero iff we should ignore time caps
-unsigned long long count = 0 ;
 //struct timespec start ;
 #define MAXIMUMFILESIZE 1000000000
-#define TIMEOUT 5 		
+#define TIMEOUT 20 		
+#define proc_cap 20 
+uint32_t last_few[proc_cap] ; // last handful of connections, same # as process cap
+uint32_t last_addr = 0 ; // index of last address 
 
 static struct in_addr listen_addr;	// Define listening endpoint
 static int listen_port;
@@ -506,7 +508,7 @@ static peer_t *parse_peer(const char *s, size_t len)
 	peer_t *p = (peer_t *) malloc(sizeof(peer_t));
 	if (p) {
 		p->next = NULL;
-		if (osp2p_snscanf(s, len, "PEER %s %I:%d",
+		if (osp2p_snscanf(s, len, "PEER %s %I:%d", // is alias name ok?
 				  p->alias, &p->addr, &p->port) >= 0
 		    && p->port > 0 && p->port <= 65535)
 			return p;
@@ -595,19 +597,10 @@ static void task_download(task_t *t, task_t *tracker_task)
 		t->filename);
 	t->peer_fd = open_socket(t->peer_list->addr, t->peer_list->port);
 
-	struct timeval tim ; // added
-	tim.tv_sec = TIMEOUT ; // added
-	tim.tv_usec = 0 ; // added
-
-	if(!force && setsockopt(t->peer_fd, SOL_SOCKET, 
-					SO_RCVTIMEO, &tim, sizeof(tim) == -1)) // added
-		error("Failed to set socket timeout\n") ;
-
-
 	while(evil_mode == 4){
 	  t->peer_fd = open_socket(t->peer_list->addr, t->peer_list->port);
 	  if (t->peer_fd == -1) {
-		error("* Cannot connect to peer: %s\n", strerror(errno));
+		//error("* Cannot connect to peer: %s\n", strerror(errno));
 		goto try_again;
 	  }
 	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
@@ -618,6 +611,14 @@ static void task_download(task_t *t, task_t *tracker_task)
 		error("* Cannot connect to peer: %s\n", strerror(errno));
 		goto try_again;
 	}
+
+	struct timeval tim ; // added
+	tim.tv_sec = TIMEOUT ; // added
+	tim.tv_usec = 0 ; // added
+
+	if(!force && setsockopt(t->peer_fd, SOL_SOCKET, 
+					SO_RCVTIMEO, &tim, sizeof(tim)) == -1) // added
+		error("* Failed to set socket timeout, %s\n", strerror(errno)) ;
 	  
 	if(evil_mode == 3)
 	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", "/etc/passwd");
@@ -671,7 +672,6 @@ static void task_download(task_t *t, task_t *tracker_task)
 	//		error("Failed to grab start time, try force again\n") ;
 	//		force = 0 ;
 	//	}
-	count = 0 ;
 	while (1) {
 		int ret = read_to_taskbuf(t->peer_fd, t);
 		if (ret == TBUF_ERROR) {
@@ -689,21 +689,11 @@ static void task_download(task_t *t, task_t *tracker_task)
 
 		if( !force )
 		{
-			//unsigned headpos = (t->head % TASKBUFSIZ);
-			//unsigned tailpos = (t->tail % TASKBUFSIZ);
-			//count += tailpos - headpos ;
-
 			if( t->total_written > MAXIMUMFILESIZE )
+			{
 				error("* FIle too long (use -f to override)") ;
 				goto try_again ;
-			//struct timespec end ;
-			//// normally shouldn't fail, ignore when it does
-			//clock_gettime( CLOCK_MONOTONIC, &end ) ; 
-			//if( end.tv_sec - start.tv_sec > TIMEOUT )
-			//{
-			//	error("Time out, peer took longer than 1 minute, continuing to next peer\n") ;
-			//	goto try_again ;
-			//}
+			}
 		}
 		ret = write_from_taskbuf(t->disk_fd, t);
 		if (ret == TBUF_ERROR) {
@@ -736,6 +726,22 @@ static void task_download(task_t *t, task_t *tracker_task)
 	task_download(t, tracker_task);
 }
 
+// check last_few for this address, if it shows up 3 times already, reject it
+// returns 0 for accept, 1 for reject
+int check_log( uint32_t addr )
+{
+	unsigned i ;
+	int sum = 0 ;
+	for( i = 0 ; i < proc_cap ; i++ )
+	{
+		if( last_few[i] == addr )
+			sum++ ;
+		if( sum > 3 )
+			return 1 ;
+	}
+	printf("%u visited %i times\n", addr, sum ) ;
+	return 0 ;
+}
 
 // task_listen(listen_task)
 //	Accepts a connection from some other peer.
@@ -747,7 +753,7 @@ static task_t *task_listen(task_t *listen_task)
 	int fd;
 	task_t *t;
 	assert(listen_task->type == TASK_PEER_LISTEN);
-
+listen:
 	fd = accept(listen_task->peer_fd,
 		    (struct sockaddr *) &peer_addr, &peer_addrlen);
 	if (fd == -1 && (errno == EINTR || errno == EAGAIN
@@ -756,6 +762,16 @@ static task_t *task_listen(task_t *listen_task)
 	else if (fd == -1)
 		die("accept");
 
+	last_few[last_addr % proc_cap] = peer_addr.sin_addr.s_addr ;
+	last_addr ++ ;
+
+	if ( check_log( peer_addr.sin_addr.s_addr ) )
+	{
+		printf("rejected frequent visitor\n") ;
+		//close( fd ) ;
+		//return NULL ;
+		goto listen ;
+	}
 	message("* Got connection from %s:%d\n",
 		inet_ntoa(peer_addr.sin_addr), ntohs(peer_addr.sin_port));
 
@@ -888,6 +904,9 @@ int main(int argc, char *argv[])
 	struct passwd *pwent;
 	int pCount = 0;
 	pid_t p;
+	unsigned i ;
+	for( i = 0; i < proc_cap ; i++ )
+		last_few[i] = 0 ;
 
 	// Default tracker is read.cs.ucla.edu 
 	osp2p_sscanf("164.67.100.231:12996", "%I:%d",
@@ -999,9 +1018,12 @@ int main(int argc, char *argv[])
 	//printf("pCount: %d\n", pCount);
 	// Then accept connections from other peers and upload files to them!
 	while ((t = task_listen(listen_task))){
+	  if(t == NULL)
+	  	continue ;
 	  pid_t p = fork();
 	  if(p == 0){
 	    task_upload(t);
+		exit(0) ;
 	    //task_free(t);
 	  } else {
 	    task_free(t);

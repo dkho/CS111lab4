@@ -52,6 +52,8 @@ tracker sends us a longer list of peers than can fit in the task buffer. Instead
 read_tracker_response, we call a function that we added, read_peer_list, which is another version
 of read_tracker_response that reads peers into a dynamically allocated array instead. We assume we
 can trust the tracker to send us a list of peers that terminates.
+	We added a log of a handful of recent connections, to protect against a denial of service 
+attack. If an ip address shows up too many times in our log, we reject the connection.
 
 # EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why
 #    are they attacks?  (~3-10 sentences each)
