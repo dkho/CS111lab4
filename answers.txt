@@ -48,12 +48,26 @@ subdirectories.
 # EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why
 #    are they attacks?  (~3-10 sentences each)
 
+Evil Mode 1:
 I added an attack that whenever anyone tries to download from our peer, instead of 
 loading the file they want, we instead upload to them a file we created called rick.txt.
 This file contains the lyrics to Rick Astley's "Never Gonna Give You Up". When the file 
 has finished uploading, instead of exiting, the peer then uses lseek() to go back to the
 start of the file and continue writing. This is an attack as it will fill up the user's 
 disk space and lock down their peer with an infinite read.
+
+Evil Mode 2:
+
+Evil Mode 3:
+I try to grab files outside of the given directory by getting the connection, then sending a
+GET request for /etc/passwd or some other important file. This is an attack as it allows
+my peer to get data that I am not supposed to have access to.
+
+Evil Mode 4:
+I run a denial of service attack on the uploader by infinitely requesting downloads from them.
+An unsecure peer will then run out of connections and hang infinitely. This is an attack as it
+allows my peer to connect to any peer that has the file that I "want" and then proceed to 
+crash it.
 
 # Extra credit problems
 #Extra credit problem: none

